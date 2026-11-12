@@ -13,13 +13,22 @@ body{font-family:Calibri,Arial,sans-serif;font-size:13px;margin:0;background:#e9
 .btn-print{background:#2ecc71;color:#fff}.btn-clear{background:#e67e22;color:#fff}.btn-row{background:#fff;color:#1f3b57}.btn-save{background:#3498db;color:#fff}.btn-imp{background:#9b59b6;color:#fff}.btn-exp{background:#16a085;color:#fff}
 .dd{position:relative;display:inline-block}.menu{display:none;position:absolute;top:110%;left:0;background:#fff;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.25);min-width:210px;z-index:20;overflow:hidden}
 .menu.open{display:block}.menu button,.menu label{display:block;width:100%;text-align:left;background:#fff;color:#1f3b57;border:none;border-radius:0;padding:10px 14px;font-weight:bold;cursor:pointer;font-size:13px}
-.menu button:hover,.menu label:hover{background:#eef3f8}.menu small{display:block;font-weight:normal;color:#777;font-size:11px}
+.menu button:hover,.menu label:hover{background:#eef3f8}
+#aiModal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center}
+.aibox{background:#fff;width:92vw;max-width:1250px;max-height:90vh;border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.aihead{background:#1f3b57;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.aihead button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer}
+.aibody{padding:12px 14px;overflow:auto;font-size:13px}.aibody p{margin:0 0 8px;color:#444}
+.aibody button{padding:7px 14px;border:none;border-radius:4px;font-weight:bold;cursor:pointer}
+#aiText{width:100%;height:90px;margin-top:8px;font:12px monospace}.aimsg{margin:6px 0;font-weight:bold;color:#1f3b57}
+.aiprev{max-height:45vh;overflow:auto;border:1px solid #ddd}#aiPrev{border-collapse:collapse;font-size:12px;width:100%}
+#aiPrev th{background:#d9d9d9;position:sticky;top:0;padding:4px;border:1px solid #bbb}#aiPrev td{border:1px solid #ddd;padding:3px 5px;min-width:60px}.menu small{display:block;font-weight:normal;color:#777;font-size:11px}
 .toolbar .msg{font-size:13px;opacity:.9}
 .page{width:277mm;height:190mm;margin:16px auto;background:#fff;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden}
 .page>*{flex:none}
 h1{text-align:center;font-size:18px;margin:0;letter-spacing:.5px}
 .head{display:grid;grid-template-columns:1.25fr 1fr;gap:30px;margin-top:6px}
-.logo{height:46px;display:flex;justify-content:flex-end;align-items:center;cursor:pointer}
+.logo{height:46px;display:flex;justify-content:center;align-items:center;cursor:pointer}
 .logo img{max-height:46px}
 .logo span{border:1px dashed #aaa;color:#999;padding:16px 24px;font-size:12px}
 .f{display:grid;grid-template-columns:110px 1fr;align-items:end;font-weight:bold;height:21px}
@@ -75,11 +84,30 @@ table.items{width:100%;border-collapse:collapse;margin-top:8px}
    <button onclick="exportExcel()">📗 Excel (.xlsx)<small>Format A4 landscape siap print</small></button>
    <button onclick="exportPdf()">📕 PDF<small>Pilih "Save as PDF" di dialog print</small></button>
   </div></div>
- <div class="dd"><button class="btn-imp" onclick="toggleMenu('mImp')">⬆ Import ▾</button>
+ <div class="dd"><button class="btn-imp" onclick="toggleMenu('mImp')">🔄 Update ▾</button>
   <div class="menu" id="mImp">
-   <label>📗 Excel Rekap BA / Klaim Inv<small>Update database dari file Excel</small><input type="file" id="fileXl" accept=".xlsx" style="display:none" onchange="importExcel(this.files[0])"></label>
+   <label>📗 Import Excel Rekap BA / Klaim Inv<small>Update per DN dari file Excel</small><input type="file" id="fileXl" accept=".xlsx" style="display:none" onchange="importExcel(this.files[0])"></label>
+   <button onclick="openAI()">🤖 Import Data Acak (AI)<small>AI menyusun data berantakan ke format Rekap BA</small></button>
   </div></div>
  <span class="msg" id="msg"></span>
+</div>
+
+<div id="aiModal" class="noprint" style="display:none">
+ <div class="aibox">
+  <div class="aihead"><b>🤖 AI Penyusun Data → Rekap BA</b><button onclick="closeAI()">✕</button></div>
+  <div class="aibody">
+   <p>Upload Excel/CSV yang formatnya acak, atau tempel teks (misal dari email/WA). AI akan mengenali kolom DN, Distributor, Carrieragent, Driver, Vessel, NART, Description, Dispatch Date, Qty Kar, Remark in BA.</p>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="file" accept=".xlsx,.csv,.txt" onchange="aiLoadFile(this.files[0])">
+    <select id="aiSheet" style="display:none"></select>
+    <button class="btn-imp" onclick="aiRun()">✨ Susun dengan AI</button>
+    <button class="btn-save" onclick="aiSave()">💾 Simpan ke Database</button>
+   </div>
+   <textarea id="aiText" placeholder="...atau tempel teks/data di sini"></textarea>
+   <div id="aiMsg" class="aimsg"></div>
+   <div class="aiprev"><table id="aiPrev"></table></div>
+  </div>
+ </div>
 </div>
 
 <div class="page">
@@ -494,10 +522,10 @@ async function importExcel(file){
     }
     const list = Object.entries(price).map(([dn, amount]) => ({ dn, amount }));
     if (!list.length) throw new Error('Format tidak dikenali. Butuh sheet "Rekap berita acara" atau keterangan klaim (Damage ... OBD 619xxxxxxx + nominal).');
-    if (!confirm(`File klaim: ${list.length} harga per DN/OBD ditemukan.\nSimpan ke database (harga lama untuk DN yang sama akan diganti)?`)) return setMsg('Import dibatalkan');
+    if (!confirm(`File klaim: ${list.length} harga per DN/OBD ditemukan.\nSimpan ke database (harga lama untuk DN yang sama akan diganti)?`)) return setMsg('Update dibatalkan');
     await sb('klaim_price?on_conflict=dn', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(list) });
-    await loadAll(); setMsg(`✓ Import harga klaim: ${list.length} DN`);
-  } catch (e) { setMsg('✗ Gagal import: ' + e.message); }
+    await loadAll(); setMsg(`✓ Update harga klaim: ${list.length} DN`);
+  } catch (e) { setMsg('✗ Gagal update: ' + e.message); }
   finally { document.getElementById('fileXl').value = ''; }
 }
 async function importRekap(rows, master){
@@ -514,14 +542,21 @@ async function importRekap(rows, master){
     out.push({ dn, distributor: sv(r[C.dist]), carrier: sv(r[C.car]), driver: sv(r[C.drv]), vessel: sv(r[C.veh]), nart, description: desc.replace(/<\(>&<\)>/g, '&'), dispatch_date: xlDate(r[C.disp]), qty_kar: sv(r[C.qty]), remark_ba: sv(r[C.rem]) });
   });
   if (!out.length) throw new Error('Tidak ada baris dengan DN Refferance');
-  if (!confirm(`File Rekap BA: ${out.length} baris (${new Set(out.map(o => o.dn)).size} DN).\nData Rekap di database akan DIGANTI dengan isi file ini. Lanjut?`)) return setMsg('Import dibatalkan');
-  setMsg('⏳ Upload ke database...');
-  await sb('ba_rekap?id=gt.0', { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  if (!confirm(`File Rekap BA: ${out.length} baris (${new Set(out.map(o => o.dn)).size} DN).\nUPDATE: DN yang ada di file akan diperbarui, DN lain di database tetap. Lanjut?`)) return setMsg('Update dibatalkan');
+  await upsertRekap(out); await loadAll(); setMsg(`✓ Update Rekap BA: ${out.length} baris`);
+}
+// update per DN: hapus baris lama untuk DN yang ada di data baru, lalu insert
+async function upsertRekap(out){
+  const dns = [...new Set(out.map(o => o.dn))];
+  for (let i = 0; i < dns.length; i += 80) {
+    const list = dns.slice(i, i + 80).map(d => '"' + d.replace(/"/g, '') + '"').join(',');
+    await sb('ba_rekap?dn=in.(' + encodeURIComponent(list) + ')', { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    setMsg(`⏳ Update DN ${Math.min(i + 80, dns.length)}/${dns.length}...`);
+  }
   for (let i = 0; i < out.length; i += 500) {
     await sb('ba_rekap', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(out.slice(i, i + 500)) });
     setMsg(`⏳ Upload ${Math.min(i + 500, out.length)}/${out.length}...`);
   }
-  await loadAll(); setMsg(`✓ Import Rekap BA: ${out.length} baris`);
 }
 
 // ===== Export =====
@@ -586,7 +621,7 @@ function buildExportXlsx(){
   return XL.writeXlsx({
     cells: [...map.values()], merges, heights, cols: [16, 40, 13, 12, 11, 11, 12, 30, 16],
     sheetName: ($v('dn') || 'Discrepancy'),
-    image: logo ? { col: 7, row: 0, dx: 60, dy: 6, w: 200, h: 46, bytes: b64ToBytes(logo.src) } : null,
+    image: logo ? { col: 6, row: 0, dx: 40, dy: 6, w: 200, h: 46, bytes: b64ToBytes(logo.src) } : null,
   });
 }
 function exportExcel(){
@@ -597,6 +632,81 @@ function exportExcel(){
     a.download = 'Discrepancy_' + ($v('dn') || 'kosong') + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     setMsg('✓ Export Excel: ' + a.download);
   } catch (e) { setMsg('✗ Gagal export: ' + e.message); }
+}
+
+// ===== AI penyusun data acak -> format Rekap BA =====
+const AI_FIELDS = ['dn','distributor','carrier','driver','vessel','nart','description','dispatch_date','qty_kar','remark_ba'];
+const AI_LABEL = { dn:'DN', distributor:'Distributor', carrier:'Carrieragent', driver:'Driver', vessel:'Vessel', nart:'NART', description:'Description', dispatch_date:'Dispatch Date', qty_kar:'Qty Kar', remark_ba:'Remark in BA' };
+let AI_ROWS = [], AI_WB = null;
+function openAI(){ toggleMenu(''); document.getElementById('aiModal').style.display = 'flex'; }
+function closeAI(){ document.getElementById('aiModal').style.display = 'none'; }
+const aiMsg = t => document.getElementById('aiMsg').textContent = t;
+async function aiCall(payload){
+  const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const j = await r.json().catch(() => ({ error: 'Respon AI tidak valid (HTTP ' + r.status + ')' }));
+  if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status)); return j;
+}
+async function aiLoadFile(file){
+  if (!file) return; AI_WB = null; const sel = document.getElementById('aiSheet'); sel.innerHTML = ''; sel.style.display = 'none';
+  try {
+    if (/\.xlsx$/i.test(file.name)) {
+      AI_WB = await XL.readWorkbook(await file.arrayBuffer());
+      sel.innerHTML = AI_WB.names.map(n => `<option>${n.replace(/</g, '&lt;')}</option>`).join(''); sel.style.display = '';
+      aiMsg('✓ File dimuat: ' + AI_WB.names.length + ' sheet. Pilih sheet lalu klik "Susun dengan AI".');
+    } else {
+      document.getElementById('aiText').value = await file.text(); aiMsg('✓ Teks dimuat dari ' + file.name);
+    }
+  } catch (e) { aiMsg('✗ Gagal baca file: ' + e.message); }
+}
+const cellStr = v => v === null || v === undefined ? '' : (typeof v === 'number' && v > 30000 && v < 60000 ? xlDate(v) : String(v)).trim();
+function normDate(v){
+  if (typeof v === 'number') return xlDate(v);
+  const s = String(v || '').trim(); if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  const d = new Date(s); return isNaN(d) ? null : d.toISOString().slice(0, 10);
+}
+function cleanRow(o){
+  const r = {}; AI_FIELDS.forEach(f => r[f] = f === 'dispatch_date' ? normDate(o[f]) : sv(o[f]));
+  r.dn = r.dn.replace(/\D/g, '') || r.dn; return r;
+}
+async function aiRun(){
+  try {
+    aiMsg('⏳ AI sedang menyusun data...'); AI_ROWS = [];
+    if (AI_WB) {
+      // spreadsheet: AI hanya membaca sampel untuk menentukan kolom, lalu semua baris dipetakan di browser
+      const rows = (await AI_WB.sheet(document.getElementById('aiSheet').value)) || [];
+      const body = rows.map(r => (r || []).map(cellStr)).filter(r => r.some(v => v));
+      if (!body.length) throw new Error('Sheet kosong');
+      const sample = body.slice(0, 12).map(r => r.slice(0, 40));
+      const j = await aiCall({ task: 'map', sample });
+      const hr = Number.isInteger(j.header_row) ? j.header_row : 0, map = j.map || {};
+      if (!Number.isInteger(map.dn)) throw new Error('AI tidak menemukan kolom DN. Coba cara tempel teks.');
+      AI_ROWS = body.slice(hr + 1).map(r => { const o = {}; AI_FIELDS.forEach(f => o[f] = Number.isInteger(map[f]) ? r[map[f]] : ''); return cleanRow(o); }).filter(o => /\d{6,}/.test(o.dn));
+    } else {
+      const text = document.getElementById('aiText').value.trim();
+      if (!text) throw new Error('Upload file atau tempel teks dulu');
+      const j = await aiCall({ task: 'extract', text: text.slice(0, 15000) });
+      AI_ROWS = (j.rows || []).map(cleanRow).filter(o => o.dn);
+    }
+    // isi deskripsi kosong dari data yang sudah ada (NART sama)
+    const D = {}; DATA.forEach(r => { if (r[5] && r[6]) D[r[5]] = r[6]; });
+    AI_ROWS.forEach(o => { if (!o.description && D[o.nart]) o.description = D[o.nart]; });
+    renderAI(); aiMsg(AI_ROWS.length ? `✓ ${AI_ROWS.length} baris tersusun (${new Set(AI_ROWS.map(o => o.dn)).size} DN). Cek & koreksi, lalu Simpan.` : '✗ AI tidak menemukan data DN');
+  } catch (e) { aiMsg('✗ ' + e.message); }
+}
+function renderAI(){
+  const t = document.getElementById('aiPrev');
+  t.innerHTML = '<tr>' + AI_FIELDS.map(f => `<th>${AI_LABEL[f]}</th>`).join('') + '<th></th></tr>' +
+    AI_ROWS.map((o, i) => '<tr>' + AI_FIELDS.map(f => `<td contenteditable="true" data-i="${i}" data-f="${f}">${String(o[f] ?? '').replace(/</g, '&lt;')}</td>`).join('') + `<td><button onclick="AI_ROWS.splice(${i},1);renderAI()">✕</button></td></tr>`).join('');
+  t.querySelectorAll('td[contenteditable]').forEach(td => td.addEventListener('input', () => AI_ROWS[td.dataset.i][td.dataset.f] = td.textContent.trim()));
+}
+async function aiSave(){
+  if (!AI_ROWS.length) return aiMsg('✗ Belum ada data');
+  const out = AI_ROWS.map(cleanRow).filter(o => o.dn);
+  if (!confirm(`Simpan ${out.length} baris (${new Set(out.map(o => o.dn)).size} DN) ke database?\nDN yang sudah ada akan diperbarui.`)) return;
+  try { aiMsg('⏳ Menyimpan...'); await upsertRekap(out); await loadAll(); aiMsg('✓ Tersimpan ' + out.length + ' baris'); setMsg('✓ Update via AI: ' + out.length + ' baris'); }
+  catch (e) { aiMsg('✗ Gagal simpan: ' + e.message); }
 }
 
 loadAll();
