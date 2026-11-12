@@ -1,0 +1,9 @@
+{
+  // Cloudflare Workers (static assets) — Delivery Discrepancy Report
+  "name": "admin-pod",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./discrepancy-report",
+    "not_found_handling": "single-page-application"
+  }
+}
