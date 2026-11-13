@@ -1,5 +1,5 @@
 // Delivery Discrepancy Report — Worker: static assets + /api/ai (Workers AI)
-// Develop Program By Nurman Catra
+// Develop Program By Yohanda IN
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 const FIELDS = `- dn: nomor DN / DN Refferance / No DO / OBD / Externorderkey / No PO (biasanya 10 digit, diawali 619)

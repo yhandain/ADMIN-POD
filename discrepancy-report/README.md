@@ -10,4 +10,4 @@ Aplikasi web PC untuk membuat & mencetak *Delivery Discrepancy Report* (A4 lands
 
 Deploy: Cloudflare Pages → root/build output directory `discrepancy-report`, tanpa build command.
 
-Develop Program By Nurman Catra
+Develop Program By Yohanda IN
